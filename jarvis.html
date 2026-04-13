@@ -287,6 +287,7 @@
 <script>
   const SUPABASE_URL = "https://kyqdjilhwfswnblqijpi.supabase.co";
   const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5cWRqaWxod2Zzd25ibHFpanBpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMTg5OTEsImV4cCI6MjA5MTU5NDk5MX0.ZgpksG62auVEvnhDrS6780j-7RdnBdiyjOL31_4sBQg";
+  const PROXY_URL = "https://jarvis-proxy.skipper-response.workers.dev/";
 
   const CATEGORIES = ["NRCS","Church","Writing","Counselling","SBC","Personal"];
   const PRI_BAR = { low: "#22c55e", medium: "#eab308", high: "#ef4444" };
@@ -330,7 +331,7 @@
   async function insertTask(t) {
     return await dbFetch("tasks", {
       method: "POST",
-      body: JSON.stringify([{ title: t.title, notes: "", category: t.category, priority: t.priority, due_hint: null, done: false }])
+      body: JSON.stringify([{ title: t.title, notes: t.notes || "", category: t.category, priority: t.priority, due_hint: t.dueHint || null, done: false }])
     });
   }
 
@@ -343,20 +344,71 @@
   }
 
   // ── Capture ──
+  async function parseWithClaude(input) {
+    const system = `You are a personal assistant for Daniel Xu, Executive Director of NRCS (Singapore community charity serving seniors), church leader at ECF Holy Word Church, writer, and counselling student at Singapore Bible College (SBC).
+
+Parse his natural language input and return ONLY valid JSON, no markdown, no explanation.
+
+Context:
+- NRCS: volunteer management, seniors programming, counselling service, renovation (Joo Seng / 裕盛), budget planning
+- Church: ECF Holy Word Church, sermon prep, pastoral work, chapel services
+- Writing: "The Essence of Bullshit" (published), "The Evelyn Paradox" (sci-fi novel), "Tension of Intentions"
+- Counselling: clinical supervision, case conceptualisation, client sessions
+- SBC: Singapore Bible College, Master's in Counselling, assignments, supervision
+- Personal: family (wife Chyanne), personal admin, health
+
+Categories: NRCS, Church, Writing, Counselling, SBC, Personal
+
+Return:
+{"tasks":[{"title":"short clear action title","notes":"any useful context or empty string","category":"one of the categories above","priority":"low|medium|high","dueHint":"today|this week|this month|someday|null"}]}
+
+Rules:
+- Extract ALL distinct tasks from the input — one input can produce multiple task objects
+- high priority = urgent, time-sensitive, or explicitly marked important
+- Infer category intelligently from context
+- Keep titles concise and action-oriented`;
+
+    const res = await fetch(PROXY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1000,
+        system,
+        messages: [{ role: "user", content: input }],
+      }),
+    });
+    const data = await res.json();
+    const text = (data.content || []).map(b => b.text || "").join("");
+    try {
+      return JSON.parse(text.replace(/```json|```/g, "").trim());
+    } catch {
+      return { tasks: [{ title: input, notes: "", category: selectedCategory, priority: document.getElementById("capture-priority").value, dueHint: null }] };
+    }
+  }
+
   async function handleCapture() {
     const input = document.getElementById("capture-input").value.trim();
     if (!input) return;
-    const priority = document.getElementById("capture-priority").value;
     const btn = document.getElementById("capture-btn");
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>saving...';
+    btn.innerHTML = '<span class="spinner"></span>thinking...';
     try {
-      const inserted = await insertTask({ title: input, category: selectedCategory, priority });
-      tasks = [...(inserted || []), ...tasks];
+      const parsed = await parseWithClaude(input);
+      const newTasks = parsed.tasks || [];
+      const inserted = await Promise.all(newTasks.map(t => insertTask({
+        title: t.title, notes: t.notes || "",
+        category: t.category || selectedCategory,
+        priority: t.priority || document.getElementById("capture-priority").value,
+        dueHint: t.dueHint || null,
+      })));
+      const flat = inserted.flat().filter(Boolean);
+      tasks = [...flat, ...tasks];
       document.getElementById("capture-input").value = "";
       updateCaptureBtn();
       renderActive(); updateBadge();
-      showFlash("✓ Task captured", "success");
+      const n = newTasks.length;
+      showFlash(`✓ ${n > 1 ? n + " tasks" : "Task"} captured`, "success");
     } catch (e) { showFlash("Error: " + e.message, "error"); }
     btn.disabled = false; btn.textContent = "CAPTURE";
   }
