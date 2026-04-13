@@ -145,7 +145,7 @@
     /* ── Task card ── */
     .task-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
     .task-card-main { display: flex; align-items: stretch; min-height: 60px; }
-    .task-priority-bar { width: 3px; flex-shrink: 0; }
+    .task-priority-bar { width: 4px; flex-shrink: 0; }
     .task-inner { flex: 1; padding: 14px 12px 14px 14px; display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
     .task-check { width: 22px; height: 22px; flex-shrink: 0; cursor: pointer; accent-color: #111; margin-top: 2px; }
     .task-body { flex: 1; min-width: 0; }
@@ -289,7 +289,8 @@
   const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5cWRqaWxod2Zzd25ibHFpanBpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMTg5OTEsImV4cCI6MjA5MTU5NDk5MX0.ZgpksG62auVEvnhDrS6780j-7RdnBdiyjOL31_4sBQg";
 
   const CATEGORIES = ["NRCS","Church","Writing","Counselling","SBC","Personal"];
-  const PRI_BAR = { low: "#e5e4e0", medium: "#aaa", high: "#111" };
+  const PRI_BAR = { low: "#22c55e", medium: "#eab308", high: "#ef4444" };
+  const CAT_BG = { NRCS: "#f0fdf4", Church: "#eff6ff", Writing: "#fdf4ff", Counselling: "#fff7ed", SBC: "#f5f3ff", Personal: "#fafaf9" };
   const PRI_ORDER = { low: 2, medium: 1, high: 0 };
 
   let tasks = [];
@@ -445,10 +446,11 @@
 
     list.innerHTML = filtered.map(task => {
       const barColor = PRI_BAR[task.priority] || PRI_BAR.low;
+      const catBg = CAT_BG[task.category] || CAT_BG.Personal;
       const priLabel = task.priority === "high" ? "● high" : task.priority === "medium" ? "● medium" : "● low";
-      const priColor = task.priority === "high" ? "#111" : task.priority === "medium" ? "#777" : "#bbb";
+      const priColor = task.priority === "high" ? "#dc2626" : task.priority === "medium" ? "#ca8a04" : "#16a34a";
       return `
-      <div class="task-card" data-id="${task.id}">
+      <div class="task-card" style="background:${catBg}" data-id="${task.id}">
         <div class="task-card-main">
           <div class="task-priority-bar" style="background:${barColor}"></div>
           <div class="task-inner">
